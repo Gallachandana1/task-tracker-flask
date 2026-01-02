@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Daily Task Booster</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    h1 { color: #2c3e50; }
+
+    li { margin-bottom: 8px; }
+
+    .status-missed { color: red; font-weight: bold; }
+    .status-pending { color: orange; }
+    .status-completed { color: green; }
+  </style>
+</head>
+
+<body onload="requestPermission()">
+
+<h1>Daily Task Booster</h1>
+
+<!-- ✅ ADD TASK FORM -->
+<form method="POST" action="/add">
+  <input type="text" name="task" placeholder="Enter task" required>
+  <input type="date" name="deadline" required>
+  <button type="submit">Add Task</button>
+  <button type="button" onclick="notifyTasks()">🔔 Notify Missed Tasks</button>
+</form>
+
+<hr>
+
+<!-- ✅ TASK LIST -->
+<ul>
+{% for task in tasks %}
+  <li class="{{task[3]}}">
+    <b>{{ task[1] }}</b> |
+    Deadline: {{ task[5] }} |
+    Status: <span class="status-{{ task[3] }}">{{ task[3] }}</span>
+
+    {% if task[6] >= 0 %}
+      ⏳ {{ task[6] }} days left
+    {% else %}
+      ❌ Deadline passed
+    {% endif %}
+
+    {% if task[3] != 'completed' %}
+      <a href="/complete/{{ task[0] }}">✅</a>
+    {% endif %}
+
+    {% if task[3] == 'missed' %}
+      <a href="/recover/{{ task[0] }}">🔄 Recover</a>
+    {% endif %}
+  </li>
+{% endfor %}
+</ul>
+
+
+<hr>
+
+<h2>📊 Progress</h2>
+<canvas id="progressChart" width="400" height="200"></canvas>
+
+<script>
+const data = {
+  labels: ["Completed", "Pending", "Missed"],
+  datasets: [{
+    label: "Tasks",
+    data: [
+      {{ stats.completed }},
+      {{ stats.pending }},
+      {{ stats.missed }}
+    ],
+    backgroundColor: ["#4CAF50", "#FFC107", "#F44336"]
+  }]
+};
+
+new Chart(document.getElementById("progressChart"), {
+  type: "bar",
+  data: data,
+  options: { responsive: true }
+});
+</script>
+
+<!-- 🔔 NOTIFICATIONS -->
+<script>
+function requestPermission() {
+  if ("Notification" in window) {
+    Notification.requestPermission();
+  }
+}
+
+function notifyTasks() {
+  fetch("/notify")
+    .then(res => res.json())
+    .then(data => {
+      if (Notification.permission === "granted") {
+        data.tasks.forEach(task => {
+          new Notification("⏰ Missed Task", {
+            body: task
+          });
+        });
+      }
+    });
+}
+
+</script>
+<script>
+setInterval(() => {
+  fetch("/notify")
+    .then(res => res.json())
+    .then(data => {
+      if (Notification.permission === "granted" && data.tasks.length > 0) {
+        new Notification("⚠️ Missed Tasks Alert", {
+          body: "You have " + data.tasks.length + " missed tasks"
+        });
+      }
+    });
+}, 300000); // 5 minutes
+</script>
+
+
+</body>
+</html>
